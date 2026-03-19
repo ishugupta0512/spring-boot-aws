@@ -48,6 +48,7 @@ jobs:
           debug: true  # optional, helps debug SCP issues
 
       # Step 6: Restart Spring Boot App on EC2
+            # Step 6: Restart Spring Boot App on EC2
       - name: Restart Spring Boot App
         uses: appleboy/ssh-action@v0.1.5
         with:
@@ -57,4 +58,7 @@ jobs:
           port: 22
           script: |
             pkill -f 'java -jar demo-0.0.1-SNAPSHOT.jar' || true
-            nohup java -jar /home/ec2-user/springboot-app/target/demo-0.0.1-SNAPSHOT.jar > /home/ec2-user/springboot-app/nohup.log 2>&1 &
+            sleep 5
+            nohup java -jar /home/ec2-user/springboot-app/target/demo-0.0.1-SNAPSHOT.jar > /home/ec2-user/springboot-app/target/nohup.log 2>&1 &
+            sleep 10
+            netstat -tulnp | grep 8080 || echo "Spring Boot did not start!"
