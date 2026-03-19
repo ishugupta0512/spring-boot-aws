@@ -16,7 +16,7 @@ public class WelcomeUser {
 
     @GetMapping("/welcome-jarvis")
     public String jarvis(){
-        return "Github has access to AWS, Sir";
+        return "Sir, Github has access to AWS!!";
     }
 
 }
