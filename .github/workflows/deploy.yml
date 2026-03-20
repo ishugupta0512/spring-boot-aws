@@ -36,6 +36,7 @@ jobs:
           script: mkdir -p /home/ec2-user/springboot-app
 
       # Step 5: Copy JAR to EC2
+      # strip_components: 1 ensures target/demo.jar becomes /home/ec2-user/springboot-app/demo.jar
       - name: Copy JAR to EC2
         uses: appleboy/scp-action@v0.1.4
         with:
@@ -43,12 +44,11 @@ jobs:
           username: ec2-user
           key: ${{ secrets.EC2_KEY }}
           port: 22
-          source: target/demo-0.0.1-SNAPSHOT.jar
-          target: /home/ec2-user/springboot-app/target/
-          debug: true  # optional, helps debug SCP issues
+          source: "target/demo-0.0.1-SNAPSHOT.jar"
+          target: "/home/ec2-user/springboot-app"
+          strip_components: 1
 
       # Step 6: Restart Spring Boot App on EC2
-            # Step 6: Restart Spring Boot App on EC2
       - name: Restart Spring Boot App
         uses: appleboy/ssh-action@v0.1.5
         with:
@@ -57,9 +57,26 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           port: 22
           script: |
-            pkill -f 'java -jar demo-0.0.1-SNAPSHOT.jar' || true
-            sleep 5
-            nohup java -jar /home/ec2-user/springboot-app/target/demo-0.0.1-SNAPSHOT.jar > /home/ec2-user/springboot-app/target/nohup.log 2>&1 &
-            disown
-            sleep 10
-            netstat -tulnp | grep 8080 || echo "Spring Boot did not start!"
+            # 1. Kill any process using port 8080 (Forceful)
+            sudo fuser -k 8080/tcp || true
+            sleep 2
+
+            # 2. Navigate to the app directory
+            cd /home/ec2-user/springboot-app
+
+            # 3. Start the application
+            # Redirecting stdin (< /dev/null) is mandatory to keep the process alive after SSH exits
+            nohup java -jar demo-0.0.1-SNAPSHOT.jar > nohup.log 2>&1 < /dev/null &
+
+            # 4. Verification
+            echo "Waiting for app to initialize..."
+            sleep 15
+            
+            if pgrep -f 'demo-0.0.1-SNAPSHOT.jar' > /dev/null; then
+              echo "Deployment Successful! Application is running."
+              netstat -tulnp | grep :8080
+            else
+              echo "ERROR: Application crashed on startup. Showing last 50 lines of nohup.log:"
+              tail -n 50 nohup.log
+              exit 1
+            fi
